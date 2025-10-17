@@ -6,6 +6,29 @@
 #include <string.h>
 #include <stdlib.h>
 
+/*
+ * Optimierte Konfiguration für das Seeed XIAO RP2040
+ * --------------------------------------------------
+ * Digital (LA): Nutzt die 8 verfügbaren Pins GPIO0 - GPIO7.
+ * Analog (Scope): Nutzt ALLE 4 verfügbaren ADC-Pins GPIO26 - GPIO29.
+ */
+#define ENABLE_LA 1
+#define ENABLE_SCOPE 1
+
+// --- Logic Analyzer (Digital) ---
+// Das XIAO RP2040 hat nur einen zusammenhängenden Block von 8 Pins (0-7) frei.
+#define PIN_BASE_DIGITAL 0
+#define PIN_COUNT_DIGITAL 8
+
+// --- Oszilloskop (Analog) ---
+// Das XIAO RP2040 führt alle 4 ADC-Pins (0-3) auf GPIO 26-29 heraus.
+#define PIN_BASE_ANALOG 26
+#define PIN_COUNT_ANALOG 4
+
+// --- Speicher & Performance ---
+// Größe des Sample-Speichers in Bytes. 200k ist ein guter Standardwert.
+#define RAM_SIZE (200 * 1024)
+
 int Dprintf(const char *fmt, ...)
 {
 
