@@ -1,0 +1,76 @@
+name: Build and Release UF2
+
+on:
+  # Löst den Workflow aus, wenn ein neuer Tag (z.B. v1.0, v1.2.3) gepusht wird
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*'
+      - 'v*'
+  
+  # Ermöglicht den manuellen Start über den "Actions"-Tab
+  workflow_dispatch:
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+
+    # Definiert die Berechtigungen, die der Job benötigt
+    permissions:
+      contents: write # Erforderlich, um ein Release zu erstellen
+
+    steps:
+      # 1. Code auschecken
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # KRITISCH: Lädt die Submodule mit (den pico-sdk)
+          submodules: 'recursive'
+
+      # 2. Build-Abhängigkeiten installieren
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+
+      # 3. Projekt kompilieren
+      - name: Build project
+        run: |
+          # Pfad zum SDK-Submodul setzen
+          export PICO_SDK_PATH=$(pwd)/pico-sdk
+          
+          # CMake ausführen
+          # Der Quellcode liegt im Unterordner 'pico_sdk_sigrok'
+          cmake -B build -S pico_sdk_sigrok -DPICO_SDK_PATH=$PICO_SDK_PATH
+          
+          # Make ausführen (mit parallelen Jobs für mehr Geschwindigkeit)
+          make -C build -j$(nproc)
+
+      # 4. Artefakt für das Release vorbereiten
+      - name: Prepare Release Artifacts
+        id: prep
+        run: |
+          # Der Dateiname der kompilierten UF2
+          UF2_FILE="build/pico_sdk_sigrok.uf2"
+          
+          # Einen neuen, versionierten Namen für das Release-Asset erstellen
+          ARTIFACT_NAME="sigrok-pico-${{ github.ref_name }}.uf2"
+          
+          # Datei kopieren und umbenennen
+          cp $UF2_FILE $ARTIFACT_NAME
+          
+          # Namen für den nächsten Schritt per Output setzen
+          echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
+      # 5. GitHub Release erstellen und UF2 hochladen
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          # Verwendet den Git-Tag, der den Lauf ausgelöst hat
+          tag_name: ${{ steps.prep.outputs.tag_name }}
+          name: "Release ${{ steps.prep.outputs.tag_name }}"
+          body: "Automatisierter Build von `pico_sdk_sigrok.uf2` für dieses Release."
+          draft: false
+          prerelease: false
+          files: ${{ steps.prep.outputs.artifact_name }} # Hängt die umbenannte UF2-Datei an
