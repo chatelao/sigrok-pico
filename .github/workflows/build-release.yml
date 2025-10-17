@@ -16,25 +16,28 @@ jobs:
       contents: write 
 
     steps:
-      # 1. Code auschecken (diesmal OHNE Submodule-Befehl)
+      # 1. Code auschecken
       - name: Checkout sigrok-pico repository
         uses: actions/checkout@v4
 
       # 2. Raspberry Pi Pico SDK als SIBLING klonen
-      # Dies ist der entscheidende neue Schritt!
-      # $(pwd) ist /home/runner/work/sigrok-pico/sigrok-pico
-      # Wir klonen den SDK nach /home/runner/work/sigrok-pico/pico-sdk
       - name: Clone Raspberry Pi Pico SDK
         run: |
           git clone --depth 1 https://github.com/raspberrypi/pico-sdk.git $(pwd)/../pico-sdk
 
-      # 3. Build-Abhängigkeiten installieren
+      # 3. NEUER SCHRITT: Submodule des PICO-SDK initialisieren (für TinyUSB)
+      - name: Initialize Pico SDK Submodules
+        run: |
+          cd $(pwd)/../pico-sdk
+          git submodule update --init --depth 1
+
+      # 4. Build-Abhängigkeiten installieren
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
 
-      # 4. Projekt kompilieren (Pfade angepasst)
+      # 5. Projekt kompilieren (Pfade angepasst)
       - name: Build project
         run: |
           # Der Pfad zum SDK ist jetzt das SIBLING-Verzeichnis
@@ -47,7 +50,7 @@ jobs:
           # Make ausführen
           make -C build -j$(nproc)
 
-      # 5. Artefakt für das Release vorbereiten
+      # 6. Artefakt für das Release vorbereiten
       - name: Prepare Release Artifacts
         id: prep
         run: |
@@ -57,7 +60,7 @@ jobs:
           echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
           echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
-      # 6. GitHub Release erstellen und UF2 hochladen
+      # 7. GitHub Release erstellen und UF2 hochladen
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
